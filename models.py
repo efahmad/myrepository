@@ -1,8 +1,6 @@
-## JUST for testing - V1
-
+## JUST for testing version 2
 
 class Product(models.Model):
-
     code = models.CharField(unique=True, max_length=10)
     name = models.CharField(max_length=100)
     price = models.PositiveIntegerField()  # ولیدیتور رو نذار
@@ -12,10 +10,15 @@ class Product(models.Model):
     #     self.inventory = 0
 
     def increase_inventory(self, amount):
-        pass
+        self.inventory+=amount
+        self.save()     # برای ذخیره تغییرات
 
     def decrease_inventory(self, amount):
-        pass
+        if (self.inventory >= amount):
+            self.inventory-=amount
+            self.save()
+        else:
+            raise Exception('مقدار درخواست شده جهت حذف از سبد، بیش از مقدار موجودی است')
 
 class User(models.Model):
     username = models.CharField()
@@ -34,10 +37,15 @@ class Customer(models.Model):
     #     balance = 20000     # بیست هزار تومان اعتبار هدیه به محض تعریف در سامانه
 
     def deposit(self, amount):      # شارژ حساب
-        pass
+        self.balance+=amount
+        self.save()
 
     def spend(self, amount):    # خرج کردن
-        pass
+        if (self.balance>=amount):
+            self.balance-=amount
+            self.save()
+        else:
+            raise Exception('کمبود اعتبار: مبلغ درخواست شده، بیش از اعتبار موجود می باشد. لطفا ابتدا حساب خود را شارژ نموده و مجددا تلاش نمایید.')
 
 
 
@@ -64,7 +72,10 @@ class Order(models.Model):
 
     @staticmethod
     def initiate(customer):
-        pass
+        o = Order()
+        o.status = Order.STATUS_SHOPPING    # وضعیت در حال خرید
+        o.customer = customer
+        o.save()
 
     def add_product(self, product, amount):
         pass
@@ -85,4 +96,3 @@ class OrderRow(models.Model):
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
     order = models.ForeignKey(Order, on_delete=models.PROTECT)
     amount = models.PositiveIntegerField()
-
