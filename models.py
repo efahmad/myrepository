@@ -1,13 +1,15 @@
+## JUST for testing - V1
+
 
 class Product(models.Model):
 
-    code = models.CharField(primary_key=True, max_length=10)
+    code = models.CharField(unique=True, max_length=10)
     name = models.CharField(max_length=100)
-    price = models.PositiveIntegerField(validators=[MinValueValidator(0)])
-    inventory = models.PositiveIntegerField(validators=[MinValueValidator(0)])
+    price = models.PositiveIntegerField()  # ولیدیتور رو نذار
+    inventory = models.PositiveIntegerField(default=0)   #validators=[MinValueValidator(0)]
 
-    def __init__(self):
-        self.inventory = 0
+    # def __init__(self):
+    #     self.inventory = 0
 
     def increase_inventory(self, amount):
         pass
@@ -15,28 +17,28 @@ class Product(models.Model):
     def decrease_inventory(self, amount):
         pass
 
+class User(models.Model):
+    username = models.CharField()
+    password = models.CharField()
+    first_name = models.CharField()
+    last_name = models.CharField()
+    email = models.EmailField()
 
 class Customer(models.Model):
-
     user = models.OneToOneField(User,on_delete=models.PROTECT)
     phone = models.CharField(max_length=20)
     address = models.TextField()
-    balance = models.PositiveIntegerField(validators=[MinValueValidator(0)])
+    balance = models.PositiveIntegerField(default=20000)
 
-    def __init__(self):
-        balance = 20000     # بیست هزار تومان اعتبار هدیه به محض تعریف در سامانه
+    # def __init__(self):
+    #     balance = 20000     # بیست هزار تومان اعتبار هدیه به محض تعریف در سامانه
 
-    def deposit(self, amount):
+    def deposit(self, amount):      # شارژ حساب
         pass
 
-    def spend(self, amount):
+    def spend(self, amount):    # خرج کردن
         pass
 
-
-class OrderRow(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.PROTECT)
-    order = models.ForeignKey(Order, on_delete=models.PROTECT)
-    amount = models.IntegerField()
 
 
 class Order(models.Model):
@@ -52,13 +54,12 @@ class Order(models.Model):
         (STATUS_CANCELED, "لغوشده"),
         (STATUS_SENT, "ارسال‌شده"),
     )
-    status = models.IntegerField(choices=status_choices)
+    status = models.IntegerField(choices=status_choices) #, default=STATUS_SHOPPING
 
-    customer = models.ForeignKey(Customer, on_delete=models.PROTECT)
-    order_time = models.DateTimeField()
-    total_price = models.PositiveIntegerField(validators=[MinValueValidator(0)])
-    rows = models.ForeignKey(OrderRow, on_delete=models.PROTECT())   #در صورت سوال به صورت لیست است
-
+    customer = models.ForeignKey(null=True ,blank=True ,Customer, on_delete=models.PROTECT)
+    order_time = models.DateTimeField(auto_now_add=True)
+    total_price = models.PositiveIntegerField()
+    # rows = models.ForeignKey(OrderRow, on_delete=models.PROTECT())   #در صورت سوال به صورت لیست است
 
 
     @staticmethod
@@ -80,11 +81,8 @@ class Order(models.Model):
     def send(self):
         pass
 
+class OrderRow(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    order = models.ForeignKey(Order, on_delete=models.PROTECT)
+    amount = models.PositiveIntegerField()
 
-class User(models.Model):
-
-    username = models.TextField()
-    password = models.TextField()
-    first_name = models.TextField()
-    last_name = models.TextField()
-    email = models.EmailField()
