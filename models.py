@@ -71,18 +71,21 @@ class Order(models.Model):
 
     @staticmethod
     def initiate(customer):
+        if Order.objects.filter(customer=customer, status=Order.STATUS_SHOPPING).exist():
+            raise Exception("There is already a shopping order for this customer in the db.") 
         o = Order()
         o.status = Order.STATUS_SHOPPING    # وضعیت در حال خرید
         o.customer = customer
         o.save()
-        return (o)      # Order
+        return o
 
     def add_product(self, product, amount):
         if (amount == 0): #امکان افزودن صفر عدد از یک کالا به سبد خرید مشتری وجود ندارد.
             raise Exception('امکان افزودن صفر عدد از یک کالا به سبد خرید مشتری وجود ندارد.')
-        elif (product.inventory < amount):  #مشتری نمی‌تواند کالایی را بیش از ظرفیت موجود در فروشگاه به سبد خرید خود اضافه کند.
-            raise Exception('کمبود کالا')
+       # elif (product.inventory < amount):  #مشتری نمی‌تواند کالایی را بیش از ظرفیت موجود در فروشگاه به سبد خرید خود اضافه کند.
+       #    raise Exception('کمبود کالا')
         else:
+            
             self.total_price += product.price * amount
             self.save()
             # آیا باید inventory محصول را نیز همزمان از Product کم کنیم ؟
