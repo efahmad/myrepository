@@ -82,8 +82,6 @@ class Order(models.Model):
     def add_product(self, product, amount):
         if (amount == 0): #امکان افزودن صفر عدد از یک کالا به سبد خرید مشتری وجود ندارد.
             raise Exception('امکان افزودن صفر عدد از یک کالا به سبد خرید مشتری وجود ندارد.')
-       # elif (product.inventory < amount):  #مشتری نمی‌تواند کالایی را بیش از ظرفیت موجود در فروشگاه به سبد خرید خود اضافه کند.
-       #    raise Exception('کمبود کالا')
         else:
             # Find the corresponding orderRow
             order_row = OrderRow.objects.filter(order=self, product=product).first()
