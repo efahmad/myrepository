@@ -85,44 +85,90 @@ class Order(models.Model):
        # elif (product.inventory < amount):  #مشتری نمی‌تواند کالایی را بیش از ظرفیت موجود در فروشگاه به سبد خرید خود اضافه کند.
        #    raise Exception('کمبود کالا')
         else:
+            # Find the corresponding orderRow
+            order_row = OrderRow.objects.filter(order=self, product=product).first()
+            if order_row is None:
+                # There is not an order row for this product in the db
+                order_row = OrderRow.objects.create(
+                    order=self,
+                    product=product,
+                    amount=amount
+                )
+             else:
+                # There was an OrderRow for this product
+                order_row.amount += amount
+                order_row.save()
             
+            # Update the total_price of the order
             self.total_price += product.price * amount
             self.save()
             # آیا باید inventory محصول را نیز همزمان از Product کم کنیم ؟
 
     def remove_product(self, product, amount=None):
-        if (amount == None):        # اگر تعدادی مشخص نشده بود، کلا Object OrderRow را Delete کن.
-            OrderRow.objects.filter(product__orderrow__order_id=product.id)[0].delete()
-        elif OrderRow.objects.filter(product__orderrow__order_id=product.id).count()>0:   # اگر محصول وارد شده در تابع، در این سفارش موجود نبود :
-            raise Exception('عدم وجود کالا جهت کم کردن از سبد خرید')
+        order_row = OrderRow.objects.filter(order=self, product=product).first()
+        if order_row is None:
+            # There was not an order row for this product in the db
+            # You can raise an Exception here or simply return
+            return
+        
+        if amount is None:        # اگر تعدادی مشخص نشده بود، کلا Object OrderRow را Delete کن.
+            order_row.delete()
         else:
-            self.total_price -= product.price*amount
-            self.save()
+            if order_row.amount < amount:
+                raise Exception("The amount value is bigger than the product amount in the order.")
+            order_row.amount -= amount
+            order_row.save()
+            
+        self.total_price -= product.price * amount
+        self.save()
 
     def submit(self):
+        if self.status != Order.STATUS_SHOPPING:
+            raise Exception("")
+         
         #در زمان ثبت سفارش، اولا باید بررسی شود که از تمام کالاهای مورد سفارش مشتری به اندازه کافی در فروشگاه وجود داشته باشد،
         # بحث چک کردن میزان موجودی، در تابع addproduct بررسی می شود.
+        # This may be implemented more efficiently
+        # order_rows = self.order_row_set.all()
+        # for row in order_rows:
+        #     if row.amount > row.product.inventory:
+        #         raise Exception(f"Not enough inventory for product {row.product.name}")
 
         # ثانیا باید مشتری به اندازی جمع مبلغ سفارش خود اعتبار داشته باشد
         # یعنی این شرط برقرار باشد  self.total_price =<  اعتبار مشتری  customer.balance
-        if self.total_price >= Customer.objects.get(id = self.customer_id ).balance :   # اگرکل مبلغ سفارش بیش از اعتبار مشتری بود
-            self.status = self.STATUS_SHOPPING #در صورتی که ثبت سفارش با موفقیت انجام نشود، سفارش «در حال خرید» باقی می‌ماند و موجودی کالاها و اعتبار مشتری نیز دست نمی‌خورد.
-            self.save()
+        if self.total_price > self.customer.balance :   # اگرکل مبلغ سفارش بیش از اعتبار مشتری بود
+            # self.status = self.STATUS_SHOPPING #در صورتی که ثبت سفارش با موفقیت انجام نشود، سفارش «در حال خرید» باقی می‌ماند و موجودی کالاها و اعتبار مشتری نیز دست نمی‌خورد.
+            # self.save()
             raise Exception('کمبود اعتبار')
         else:
-            self.status = self.STATUS_SUBMITTED  # سفارش «ثبت‌شده» تلقی می‌شود و پول آن از حساب مشتری کاسته شده و موجودی کالاها نیز از موجودی فروشگاه کم می‌شوند.
-            self.save()
-            c = Customer.objects.get(id = self.customer_id )    # ول آن از حساب مشتری کاسته شده
-            c.balance -= self.total_price
-            c.save()
+            # These should be executed in a transaction
+            with transaction.atomic()
+                self.customer.spend(self.total_price)
+                order_rows = self.order_row_set.all()
+                for row in order_rows:
+                    row.product.decrease_inventory(row.amount)
+                self.status = self.STATUS_SUBMITTED  # سفارش «ثبت‌شده» تلقی می‌شود و پول آن از حساب مشتری کاسته شده و موجودی کالاها نیز از موجودی فروشگاه کم می‌شوند.
+                self.save()
 
     def cancel(self):       # از سفارش خود انصراف داده و اعتبار خود را پس بگیرد. در این صورت وضعیت سفارش به «لغوشده» تغییر کرده و کالاها نیز به موجودی فروشگاه برمی‌گردند.
-        pass
-        # self.status = self.STATUS_CANCELED
-        # self.save()
+        if self.status != Order.STATUS_SUBMITTED:
+            raise Exception("The order is not submitted.")
+        
+        # These should be executed in a transaction
+        with transaction.atomic():
+            self.customer.deposit(self.total_price)
+            order_rows = self.order_row_set.all()
+            for row in order_rows:
+                row.product.increase_inventory(row.amount)
+            self.status = self.STATUS_CANCELED
+            self.save()
 
     def send(self):
-        pass
+        if self.status != Order.STATUS_SUBMITTED:
+            raise Exception("The order is not submitted.")
+        self.status = self.STATUS_SENT
+        self.save()
+           
 
 class OrderRow(models.Model):
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
